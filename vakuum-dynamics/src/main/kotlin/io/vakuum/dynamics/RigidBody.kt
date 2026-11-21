@@ -44,6 +44,12 @@ class RigidBody {
     /** Whether the body is awake and participating in simulation. */
     var awake: Boolean = true
 
+    /** Sleep timer: counts steps below the sleep threshold. */
+    var sleepTimer: Int = 0
+
+    /** Minimum number of steps below threshold before sleeping. */
+    var sleepTimeLimit: Int = 60
+
     /** Linear damping factor (0.0 = no damping). */
     var linearDamping: Double = 0.0
 
@@ -78,11 +84,32 @@ class RigidBody {
     }
 
     /**
+     * Wake up this body and reset the sleep timer.
+     */
+    fun wakeUp() {
+        awake = true
+        sleepTimer = 0
+    }
+
+    /**
+     * Check if this body should sleep based on its velocity.
+     * @param speedThreshold Maximum speed to consider the body at rest.
+     * @return true if the body is below the threshold.
+     */
+    fun isAtRest(speedThreshold: Double): Boolean {
+        if (bodyType == BodyType.STATIC) return false
+        return linearVelocity.lengthSquared < speedThreshold * speedThreshold &&
+                angularVelocity.lengthSquared < speedThreshold * speedThreshold
+    }
+
+    /**
      * Apply a force at a specific point in world space.
      * Adds both linear force and torque from the offset.
+     * Wakes up the body if it was sleeping.
      */
     fun applyForce(atWorldPoint: Vector3, worldForce: Vector3) {
         if (bodyType == BodyType.STATIC) return
+        wakeUp()
         force += worldForce
         // Torque = r × F
         val r = atWorldPoint - transform.position
@@ -91,17 +118,21 @@ class RigidBody {
 
     /**
      * Apply a force at the center of mass.
+     * Wakes up the body if it was sleeping.
      */
     fun applyForceAtCenter(worldForce: Vector3) {
         if (bodyType == BodyType.STATIC) return
+        wakeUp()
         force += worldForce
     }
 
     /**
      * Apply an impulse at a specific point in world space.
+     * Wakes up the body if it was sleeping.
      */
     fun applyImpulse(atWorldPoint: Vector3, worldImpulse: Vector3) {
         if (bodyType == BodyType.STATIC) return
+        wakeUp()
         val r = atWorldPoint - transform.position
         val localR = transform.rotation.conjugate().rotateVector(r)
 

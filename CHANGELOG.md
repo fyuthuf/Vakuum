@@ -2,6 +2,35 @@
 
 All notable changes to Vakuum will be documented in this file.
 
+## [0.3.0] - 2026-11-21
+
+### Added
+- **Dynamic AABB Tree** — O(log n) broadphase with binary tree nodes, proxy insertion/removal, rebalancing, and ray queries
+- **TreeBroadphase** — Tree-based broadphase implementation; BruteForceBroadphase retained as reference
+- **Continuous Collision Detection (CCD)** — Swept AABB + TOI for Box, Sphere, Capsule, ConvexHull vs static obstacles
+- **New Collision Shapes** — SphereShape, CapsuleShape, ConvexHullShape with full narrowphase and CCD support
+- **Collision Filtering** — Category masks, collision groups, layer-based filtering via CollisionFilter
+- **Sleeping System** — Automatic sleep/wake for bodies at rest with configurable thresholds
+- **Contact Caching** — Persistent contacts between frames with warm starting infrastructure
+- **Sequential Impulse Solver** — Stable PGS solver with accumulated impulse clamping, Coulomb friction, and Baumgarte stabilization
+- **CCD Diagnostics** — ccdSteps, toiQueries, maxSubstepsReached, fallbackCount, maximumPenetration
+- **Website Integration** — `vakuum-website` module with SimulationSession, grab constraints, boundary walls, and state snapshots
+- **Benchmark Suite** — 8 scenarios: 100/500/1000 bodies, dense collision, large stack, mixed shapes, CCD, long-running
+- **Documentation** — CCD_SUPPORT.md, COLLISION_SHAPES.md, SOLVER.md, BENCHMARKS.md, LIMITATIONS.md, WEBSITE_INTEGRATION.md
+
+### Fixed
+- CCD: toiBoxPlane/toiBoxBox return null when already penetrating (prevents infinite substep loops)
+- CCD: toiBoxBox no longer mutates body transforms during binary search
+- CCD: near-zero TOI protection (< 1e-8) prevents substep loops
+- CCD: velocities integrate correctly on each substep with remainingDt
+- Solver: restitution applied only on first iteration as velocity bias
+- Solver: penetration slop (0.001m) prevents jitter on resting contacts
+
+### Changed
+- SimulationPipeline refactored: step() dispatches to stepDiscrete/stepWithCcd
+- SimulationPipeline: generic CCD dispatch for all shape types via queryToiAgainstPlane/queryToiAgainstStatic
+- README.md updated with V0.3.0 features and documentation links
+
 ## [0.2.1] - 2026-11-21
 
 ### Fixed

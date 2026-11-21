@@ -23,6 +23,7 @@
         <module>vakuum-runtime</module>
         <module>vakuum-tests</module>
         <module>vakuum-runner</module>
+        <module>vakuum-website</module>
     </modules>
 
     <properties>
@@ -99,6 +100,11 @@
                 <artifactId>vakuum-runner</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>io.vakuum</groupId>
+                <artifactId>vakuum-website</artifactId>
+                <version>${project.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -135,6 +141,9 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.2</version>
+                <configuration>
+                    <useSystemClassLoader>false</useSystemClassLoader>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

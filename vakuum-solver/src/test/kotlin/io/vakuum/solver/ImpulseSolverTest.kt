@@ -327,4 +327,114 @@ class ImpulseSolverTest {
         // Velocity should not change since bodies are separating
         assertEquals(initialVelA, bodyA.linearVelocity, "Separating bodies should not be resolved")
     }
+
+    @Test
+    fun `approaching bodies are separated by impulse`() {
+        // Two bodies moving toward each other along X axis.
+        // BodyA at origin moving right, BodyB at (1, 0, 0) moving left.
+        // Normal should push bodyA to the left (-X) and bodyB to the right (+X).
+        val bodyA = rigidBody()
+            .id(1)
+            .position(0.0, 0.0, 0.0)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+        bodyA.linearVelocity = Vector3(3.0, 0.0, 0.0)
+
+        val bodyB = rigidBody()
+            .id(2)
+            .position(1.0, 0.0, 0.0)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+        bodyB.linearVelocity = Vector3(-3.0, 0.0, 0.0)
+
+        // Normal points in push direction for bodyA: -X (away from B)
+        val contact = ContactManifold(
+            contactPoint = Vector3(0.5, 0.0, 0.0),
+            normal = Vector3(-1.0, 0.0, 0.0),
+            penetrationDepth = 0.1
+        )
+
+        val solver = ImpulseSolver(SolverSettings(iterations = 10, defaultRestitution = 0.0))
+        solver.solveContact(bodyA, bodyB, contact, 1.0 / 60.0)
+
+        // After collision with equal mass and zero restitution, velocities should swap.
+        // BodyA should move left (negative X) or stop, BodyB should move right (positive X) or stop.
+        assertTrue(bodyA.linearVelocity.x <= 0.0 + epsilon, "BodyA should not continue moving right after collision, x=${bodyA.linearVelocity.x}")
+        assertTrue(bodyB.linearVelocity.x >= 0.0 - epsilon, "BodyB should not continue moving left after collision, x=${bodyB.linearVelocity.x}")
+    }
+
+    @Test
+    fun `impulse does not pull bodies together`() {
+        // Verify that the impulse never increases the approach velocity.
+        // Two bodies approaching each other.
+        val bodyA = rigidBody()
+            .id(1)
+            .position(0.0, 0.0, 0.0)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+        bodyA.linearVelocity = Vector3(2.0, 0.0, 0.0)
+
+        val bodyB = rigidBody()
+            .id(2)
+            .position(1.0, 0.0, 0.0)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+        bodyB.linearVelocity = Vector3(-2.0, 0.0, 0.0)
+
+        // Relative approach velocity: 4.0 m/s toward each other
+        val normal = Vector3(-1.0, 0.0, 0.0) // Push direction for bodyA
+        val contact = ContactManifold(
+            contactPoint = Vector3(0.5, 0.0, 0.0),
+            normal = normal,
+            penetrationDepth = 0.1
+        )
+
+        val solver = ImpulseSolver(SolverSettings(iterations = 10, defaultRestitution = 0.0))
+        solver.solveContact(bodyA, bodyB, contact, 1.0 / 60.0)
+
+        // After impulse, the relative velocity along the normal should not be more negative
+        // than before (i.e., bodies should not be pulled together).
+        val relativeVelocity = bodyA.linearVelocity - bodyB.linearVelocity
+        val velAlongNormal = relativeVelocity.dot(normal)
+        // With zero restitution, velAlongNormal should be >= 0 (bodies separating or at rest)
+        // With positive restitution, velAlongNormal should be > 0 (bodies separating)
+        assertTrue(velAlongNormal >= -epsilon, "Relative velocity along normal should not be negative after impulse, vel=$velAlongNormal")
+    }
+
+    @Test
+    fun `position correction separates penetrating bodies`() {
+        // Two overlapping bodies. Position correction should push them apart.
+        val bodyA = rigidBody()
+            .id(1)
+            .position(0.0, 0.0, 0.0)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        val bodyB = rigidBody()
+            .id(2)
+            .position(0.3, 0.0, 0.0)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        val initialDistance = bodyA.transform.position.distanceTo(bodyB.transform.position)
+
+        // Normal points in push direction for bodyA: -X (away from B)
+        val contact = ContactManifold(
+            contactPoint = Vector3(0.15, 0.0, 0.0),
+            normal = Vector3(-1.0, 0.0, 0.0),
+            penetrationDepth = 0.7
+        )
+
+        val solver = ImpulseSolver(SolverSettings(penetrationPercentage = 0.5))
+        solver.solvePositionCorrection(bodyA, bodyB, contact, 1.0 / 60.0)
+
+        val newDistance = bodyA.transform.position.distanceTo(bodyB.transform.position)
+        assertTrue(newDistance > initialDistance, "Bodies should be pushed apart: initial=$initialDistance, new=$newDistance")
+    }
 }

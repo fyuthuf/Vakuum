@@ -26,6 +26,31 @@ data class PhysicsConfiguration(
 
     /** Velocity threshold for sleeping (m/s). Default: 0.03. */
     val sleepThreshold: Double = 0.03,
+
+    /** Enable Continuous Collision Detection. Default: false. */
+    val ccdEnabled: Boolean = false,
+
+    /**
+     * Minimum velocity magnitude (m/s) for CCD activation.
+     * Bodies moving slower than this threshold use discrete collision detection.
+     * Default: 10.0 m/s.
+     */
+    val ccdVelocityThreshold: Double = 10.0,
+
+    /**
+     * Maximum number of CCD substeps per simulation step.
+     * Prevents infinite loops in cases of repeated impacts.
+     * Default: 10.
+     */
+    val ccdMaxSubsteps: Int = 10,
+
+    /**
+     * TOI (Time of Impact) tolerance.
+     * Minimum fraction of remaining timestep to consider a valid TOI.
+     * Prevents infinite loops from near-zero TOI values.
+     * Default: 0.001 (0.1% of remaining time).
+     */
+    val ccdToiTolerance: Double = 0.001,
 ) {
     init {
         require(!gravity.x.isNaN() && !gravity.y.isNaN() && !gravity.z.isNaN()) {
@@ -48,6 +73,15 @@ data class PhysicsConfiguration(
         }
         require(sleepThreshold >= 0.0) {
             "Sleep threshold must be non-negative"
+        }
+        require(ccdVelocityThreshold > 0.0) {
+            "CCD velocity threshold must be positive"
+        }
+        require(ccdMaxSubsteps > 0) {
+            "CCD max substeps must be positive"
+        }
+        require(ccdToiTolerance in 0.0..1.0) {
+            "CCD TOI tolerance must be between 0.0 and 1.0"
         }
     }
 

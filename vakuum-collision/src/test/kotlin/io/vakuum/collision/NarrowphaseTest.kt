@@ -146,7 +146,9 @@ class NarrowphaseTest {
     }
 
     @Test
-    fun `box box collision normal points from A to B`() {
+    fun `box box collision normal points in push direction for bodyA`() {
+        // BodyA at origin, BodyB at (0.5, 0, 0) — they overlap along X.
+        // BodyB is to the right of BodyA, so the push direction for bodyA is -X (left, away from B).
         val bodyA = rigidBody()
             .id(1)
             .position(0.0, 0.0, 0.0)
@@ -167,8 +169,203 @@ class NarrowphaseTest {
         val contact = narrowphase.testBoxBox(bodyA, bodyB, shapeA, shapeB)
 
         assertNotNull(contact)
-        // Normal should point from A to B (positive X direction)
-        assertTrue(contact!!.normal.x > 0.0 || contact!!.normal.x < 0.0, "Normal should have X component")
+        // Normal should point in push direction for bodyA: away from bodyB, i.e., -X
+        assertTrue(contact!!.normal.x < -0.5, "Normal X should be negative (push bodyA away from B)")
+        assertTrue(kotlin.math.abs(contact.normal.y) < epsilon, "Normal Y should be near zero")
+        assertTrue(kotlin.math.abs(contact.normal.z) < epsilon, "Normal Z should be near zero")
+    }
+
+    @Test
+    fun `box box collision normal is consistent when bodies are swapped`() {
+        // Test that swapping A and B reverses the normal direction.
+        val bodyA = rigidBody()
+            .id(1)
+            .position(0.0, 0.0, 0.0)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        val bodyB = rigidBody()
+            .id(2)
+            .position(0.5, 0.0, 0.0)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        val shapeA = BoxShape(Vector3(0.5, 0.5, 0.5))
+        val shapeB = BoxShape(Vector3(0.5, 0.5, 0.5))
+
+        val contactAB = narrowphase.testBoxBox(bodyA, bodyB, shapeA, shapeB)
+        val contactBA = narrowphase.testBoxBox(bodyB, bodyA, shapeB, shapeA)
+
+        assertNotNull(contactAB)
+        assertNotNull(contactBA)
+
+        // Normal for AB should be opposite to normal for BA
+        // Because push direction for bodyA in AB is opposite to push direction for bodyB in BA
+        val dot = contactAB!!.normal.dot(contactBA!!.normal)
+        assertTrue(dot < -0.99, "Normals should be opposite when bodies are swapped, dot=$dot")
+    }
+
+    @Test
+    fun `box box collision normal with rotated boxes`() {
+        // BodyA at origin, rotated 45 degrees around Z.
+        // BodyB at (1, 1, 0), axis-aligned.
+        // They should collide, and the normal should point away from B toward A.
+        val bodyA = rigidBody()
+            .id(1)
+            .position(0.0, 0.0, 0.0)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        // Rotate 45 degrees around Z
+        bodyA.transform = io.vakuum.math.Transform(
+            bodyA.transform.position,
+            io.vakuum.math.Quaternion.fromAxisAngle(Vector3.UNIT_Z, Math.PI / 4.0)
+        )
+
+        val bodyB = rigidBody()
+            .id(2)
+            .position(1.0, 1.0, 0.0)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        val shapeA = BoxShape(Vector3(0.5, 0.5, 0.5))
+        val shapeB = BoxShape(Vector3(0.5, 0.5, 0.5))
+
+        val contact = narrowphase.testBoxBox(bodyA, bodyB, shapeA, shapeB)
+
+        if (contact != null) {
+            // Normal should point from B toward A (push direction for bodyA)
+            // Vector from B to A: (-1, -1, 0)
+            val bToA = bodyA.transform.position - bodyB.transform.position
+            val dot = contact.normal.dot(bToA)
+            assertTrue(dot > 0.0, "Normal should have a component toward A from B, dot=$dot")
+        }
+        // If no contact, the boxes may not overlap at this configuration — that's also valid
+    }
+
+    @Test
+    fun `box box collision normal with coincident centers`() {
+        // Two boxes with the same center — fully overlapping.
+        // The normal should still be well-defined.
+        val bodyA = rigidBody()
+            .id(1)
+            .position(0.0, 0.0, 0.0)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        val bodyB = rigidBody()
+            .id(2)
+            .position(0.0, 0.0, 0.0)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        val shapeA = BoxShape(Vector3(0.5, 0.5, 0.5))
+        val shapeB = BoxShape(Vector3(0.5, 0.5, 0.5))
+
+        val contact = narrowphase.testBoxBox(bodyA, bodyB, shapeA, shapeB)
+
+        // When centers are coincident, translation is zero, so the normal direction
+        // depends on the first axis tested. The key is that it should not be NaN.
+        if (contact != null) {
+            assertFalse(contact.normal.x.isNaN(), "Normal X should not be NaN")
+            assertFalse(contact.normal.y.isNaN(), "Normal Y should not be NaN")
+            assertFalse(contact.normal.z.isNaN(), "Normal Z should not be NaN")
+            assertTrue(contact.normal.length > 0.0, "Normal should not be zero length")
+        }
+    }
+
+    @Test
+    fun `box box collision normal with nearly coincident centers`() {
+        // Two boxes almost at the same position — very small translation.
+        val bodyA = rigidBody()
+            .id(1)
+            .position(0.0, 0.0, 0.0)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        val bodyB = rigidBody()
+            .id(2)
+            .position(1e-8, 0.0, 0.0)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        val shapeA = BoxShape(Vector3(0.5, 0.5, 0.5))
+        val shapeB = BoxShape(Vector3(0.5, 0.5, 0.5))
+
+        val contact = narrowphase.testBoxBox(bodyA, bodyB, shapeA, shapeB)
+
+        if (contact != null) {
+            assertFalse(contact.normal.x.isNaN(), "Normal X should not be NaN")
+            assertFalse(contact.normal.y.isNaN(), "Normal Y should not be NaN")
+            assertFalse(contact.normal.z.isNaN(), "Normal Z should not be NaN")
+        }
+    }
+
+    @Test
+    fun `box box collision normal along Y axis`() {
+        // BodyA below BodyB along Y axis.
+        // Push direction for bodyA should be -Y (down, away from B above).
+        val bodyA = rigidBody()
+            .id(1)
+            .position(0.0, 0.0, 0.0)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        val bodyB = rigidBody()
+            .id(2)
+            .position(0.0, 0.5, 0.0)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        val shapeA = BoxShape(Vector3(0.5, 0.5, 0.5))
+        val shapeB = BoxShape(Vector3(0.5, 0.5, 0.5))
+
+        val contact = narrowphase.testBoxBox(bodyA, bodyB, shapeA, shapeB)
+
+        assertNotNull(contact)
+        // BodyB is above bodyA. Push direction for bodyA is -Y (down, away from B).
+        assertTrue(contact!!.normal.y < -0.5, "Normal Y should be negative (push bodyA down, away from B)")
+        assertTrue(kotlin.math.abs(contact.normal.x) < epsilon, "Normal X should be near zero")
+        assertTrue(kotlin.math.abs(contact.normal.z) < epsilon, "Normal Z should be near zero")
+    }
+
+    @Test
+    fun `box box collision normal along Z axis`() {
+        // BodyA in front of BodyB along Z axis.
+        val bodyA = rigidBody()
+            .id(1)
+            .position(0.0, 0.0, 0.0)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        val bodyB = rigidBody()
+            .id(2)
+            .position(0.0, 0.0, 0.5)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        val shapeA = BoxShape(Vector3(0.5, 0.5, 0.5))
+        val shapeB = BoxShape(Vector3(0.5, 0.5, 0.5))
+
+        val contact = narrowphase.testBoxBox(bodyA, bodyB, shapeA, shapeB)
+
+        assertNotNull(contact)
+        // BodyB is in +Z direction from bodyA. Push direction for bodyA is -Z.
+        assertTrue(contact!!.normal.z < -0.5, "Normal Z should be negative (push bodyA away from B)")
+        assertTrue(kotlin.math.abs(contact.normal.x) < epsilon, "Normal X should be near zero")
+        assertTrue(kotlin.math.abs(contact.normal.y) < epsilon, "Normal Y should be near zero")
     }
 
     @Test

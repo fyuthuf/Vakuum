@@ -98,6 +98,15 @@ data class AABB(val min: Vector3, val max: Vector3) {
     }
 
     /**
+     * Calculate the surface area of this AABB.
+     * Used by the Dynamic AABB Tree for the surface area heuristic.
+     */
+    fun surfaceArea(): Double {
+        val size = max - min
+        return 2.0 * (size.x * size.y + size.y * size.z + size.z * size.x)
+    }
+
+    /**
      * Check if this AABB intersects a bounding sphere.
      */
     fun intersects(sphere: BoundingSphere): Boolean {

@@ -52,6 +52,11 @@ class SimulationExporter(private val config: PhysicsConfiguration) {
         file.writeText(buildJson())
     }
 
+    /**
+     * Get the recorded frames as a JSON string.
+     */
+    fun toJson(): String = buildJson()
+
     private fun buildJson(): String {
         val sb = StringBuilder()
         sb.appendLine("{")

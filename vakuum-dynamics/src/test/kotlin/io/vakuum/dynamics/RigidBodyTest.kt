@@ -441,4 +441,163 @@ class RigidBodyTest {
             prevVelocityY = body.linearVelocity.y
         }
     }
+
+    // === Sleeping tests ===
+
+    @Test
+    fun `wakeUp sets awake and resets timer`() {
+        val body = rigidBody()
+            .id(1)
+            .bodyType(BodyType.DYNAMIC)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        body.awake = false
+        body.sleepTimer = 100
+        body.wakeUp()
+
+        assertTrue(body.awake)
+        assertEquals(0, body.sleepTimer)
+    }
+
+    @Test
+    fun `isAtRest returns true when velocity is below threshold`() {
+        val body = rigidBody()
+            .id(1)
+            .bodyType(BodyType.DYNAMIC)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        body.linearVelocity = Vector3(0.0, 0.0, 0.0)
+        body.angularVelocity = Vector3(0.0, 0.0, 0.0)
+
+        assertTrue(body.isAtRest(0.03))
+    }
+
+    @Test
+    fun `isAtRest returns false when velocity is above threshold`() {
+        val body = rigidBody()
+            .id(1)
+            .bodyType(BodyType.DYNAMIC)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        body.linearVelocity = Vector3(0.0, 10.0, 0.0)
+
+        assertFalse(body.isAtRest(0.03))
+    }
+
+    @Test
+    fun `isAtRest returns false for static bodies`() {
+        val body = rigidBody()
+            .id(0)
+            .bodyType(BodyType.STATIC)
+            .mass(0.0)
+            .build()
+
+        assertFalse(body.isAtRest(0.03), "Static bodies should never be considered at rest")
+    }
+
+    @Test
+    fun `isAtRest checks angular velocity`() {
+        val body = rigidBody()
+            .id(1)
+            .bodyType(BodyType.DYNAMIC)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        body.linearVelocity = Vector3.ZERO
+        body.angularVelocity = Vector3(0.0, 1.0, 0.0) // Spinning
+
+        assertFalse(body.isAtRest(0.03), "Spinning body should not be at rest")
+    }
+
+    @Test
+    fun `applyForce wakes up sleeping body`() {
+        val body = rigidBody()
+            .id(1)
+            .bodyType(BodyType.DYNAMIC)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        body.awake = false
+        body.applyForceAtCenter(Vector3(0.0, -10.0, 0.0))
+
+        assertTrue(body.awake, "Body should wake up on force application")
+        assertEquals(0, body.sleepTimer)
+    }
+
+    @Test
+    fun `applyImpulse wakes up sleeping body`() {
+        val body = rigidBody()
+            .id(1)
+            .bodyType(BodyType.DYNAMIC)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        body.awake = false
+        body.applyImpulse(body.transform.position, Vector3(0.0, 10.0, 0.0))
+
+        assertTrue(body.awake, "Body should wake up on impulse application")
+        assertEquals(0, body.sleepTimer)
+    }
+
+    @Test
+    fun `sleep timer increments when at rest`() {
+        val body = rigidBody()
+            .id(1)
+            .bodyType(BodyType.DYNAMIC)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        body.linearVelocity = Vector3.ZERO
+        body.angularVelocity = Vector3.ZERO
+
+        // Simulate sleep check
+        repeat(60) {
+            assertTrue(body.isAtRest(0.03))
+            body.sleepTimer++
+        }
+
+        assertEquals(60, body.sleepTimer)
+        assertTrue(body.sleepTimer >= body.sleepTimeLimit)
+    }
+
+    @Test
+    fun `sleep timer resets when body moves`() {
+        val body = rigidBody()
+            .id(1)
+            .bodyType(BodyType.DYNAMIC)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        body.sleepTimer = 50
+        body.linearVelocity = Vector3(0.0, 10.0, 0.0)
+
+        assertFalse(body.isAtRest(0.03))
+        body.sleepTimer = 0 // Reset in pipeline
+
+        assertEquals(0, body.sleepTimer)
+    }
+
+    @Test
+    fun `sleepTimeLimit is configurable`() {
+        val body = rigidBody()
+            .id(1)
+            .bodyType(BodyType.DYNAMIC)
+            .mass(1.0)
+            .halfExtents(0.5, 0.5, 0.5)
+            .build()
+
+        body.sleepTimeLimit = 10
+        assertEquals(10, body.sleepTimeLimit)
+    }
 }

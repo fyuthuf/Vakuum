@@ -8,22 +8,21 @@ It is **NOT** a Minecraft mod, a Valkyrien Skies addon, or a wrapper around an e
 
 Vakuum's architecture is inspired by [Jolt Physics](https://github.com/jrouwe/JoltPhysics) (public documentation only). Jolt is an architectural and educational reference, **not** a runtime dependency.
 
-## Current Status: V0.2.1 — Quality, Stability & Release Preparation
+## Current Status: V0.3.0 — Performance & Collision Expansion
 
-V0.2.1 is a quality improvement release that fixes critical bugs, adds integration tests, and prepares the repository for public GitHub publication.
+V0.3.0 adds Dynamic AABB Tree broadphase, Continuous Collision Detection (CCD), Sphere/Capsule/ConvexHull shapes, collision filtering, sleeping system, contact caching, and a website integration adapter for Vakuum.xyz.
 
-### V0.2.1 Changes
+### V0.3.0 Features
 
-- **Fixed**: Narrowphase SAT now correctly handles rotated boxes
-- **Fixed**: Broadphase uses actual collision shapes instead of hardcoded defaults
-- **Added**: 8 integration tests covering the full physics pipeline
-- **Added**: GitHub Actions CI workflow
-- **Added**: BUILDING.md, CONTRIBUTING.md, CHANGELOG.md
-- **Removed**: Dead code and unused imports
-
-### V0.2 Features
-
-V0.2 adds rigid body dynamics, collision detection, an impulse-based collision solver, and a Blender visualization bridge.
+- **Dynamic AABB Tree** — O(log n) broadphase replacing O(n²) brute force
+- **CCD** — Continuous Collision Detection for fast-moving bodies (Box, Sphere, Capsule, ConvexHull vs static obstacles)
+- **New Collision Shapes** — Sphere, Capsule, ConvexHull with full narrowphase and CCD support
+- **Collision Filtering** — Category masks, collision groups, layer-based filtering
+- **Sleeping System** — Automatic sleep/wake for bodies at rest
+- **Contact Caching** — Persistent contacts with warm starting infrastructure
+- **Sequential Impulse Solver** — Stable PGS solver with accumulated impulse clamping
+- **Website Integration** — `vakuum-website` module for Vakuum.xyz with session management and grab constraints
+- **Benchmark Suite** — 8 benchmark scenarios for performance measurement
 
 ### Implemented
 
@@ -36,7 +35,7 @@ V0.2 adds rigid body dynamics, collision detection, an impulse-based collision s
 
 - **Physics Core** (`vakuum-core`):
   - PhysicsWorld with lifecycle (initialize, step, pause, resume, shutdown)
-  - PhysicsConfiguration with gravity, timestep, solver iterations
+  - PhysicsConfiguration with gravity, timestep, solver iterations, CCD settings
   - Fixed timestep simulation
   - State management (IDLE, RUNNING, PAUSED, STOPPED)
 
@@ -45,36 +44,58 @@ V0.2 adds rigid body dynamics, collision detection, an impulse-based collision s
   - Mass properties with inertia tensor
   - Semi-implicit Euler integration
   - Gravity, damping, force/torque application
+  - Sleeping with configurable thresholds
 
 - **Collision Detection** (`vakuum-collision`):
-  - Box-box collision using SAT (Separating Axis Theorem)
-  - Box-plane collision detection
-  - Broadphase O(n²) pair detection
+  - **Shapes**: Box, Sphere, Capsule, ConvexHull, Plane
+  - **Broadphase**: Dynamic AABB Tree (O(log n)) + Brute Force (O(n²) reference)
+  - **Narrowphase**: SAT for all shape pairs
+  - **CCD**: Swept AABB + TOI for all shapes vs static obstacles
+  - **Filtering**: Category masks, collision groups
   - Contact manifold generation
 
 - **Collision Solver** (`vakuum-solver`):
-  - Impulse-based solver with Gauss-Seidel relaxation
-  - Normal impulse with restitution
-  - Friction using Coulomb's law
-  - Penetration correction (Baumgarte stabilization)
+  - Sequential Impulse (Projected Gauss-Seidel) solver
+  - Normal impulse with accumulated clamping
+  - Coulomb friction with friction cone
+  - Restitution as velocity bias (first iteration only)
+  - Penetration correction (Baumgarte stabilization with slop)
 
 - **Simulation Runner** (`vakuum-runner`):
-  - Full physics pipeline: integrate → collide → solve → correct
+  - Full physics pipeline: integrate → broadphase → narrowphase → solve → correct
+  - CCD substep processing with TOI
+  - Contact caching and warm starting infrastructure
   - JSON export for frame-by-frame body transforms
-  - 5 experiments: single cube, multiple cubes, stacking, stress test, reproducibility
+  - CCD diagnostics
+
+- **Website Integration** (`vakuum-website`):
+  - Isolated simulation sessions
+  - Body spawning (Box, Sphere)
+  - Grab constraints with natural release
+  - Boundary walls for ASCII Playground
+  - State snapshots and diagnostics
 
 - **Blender Bridge** (`vakuum-blender/`):
   - Python scripts to import JSON simulation data
   - Automatic keyframe animation
   - Camera and lighting setup
 
+- **Benchmarks** (`vakuum-tests`):
+  - 8 benchmark scenarios: 100/500/1000 bodies, dense collision, large stack, mixed shapes, CCD, long-running
+  - P50/P95/P99 latency measurement
+  - Deterministic with fixed random seeds
+
 ### Not Yet Implemented
 
-- Capsule, sphere, convex hull collision shapes (V0.3)
-- Continuous collision detection (V0.6)
-- Sleeping system (V0.6)
-- Multithreading (V0.7)
-- Joints beyond basic constraints (V0.8)
+- Joint constraints (hinge, fixed, distance) — V0.6
+- Multithreading — V0.7
+- Concave mesh collision — V0.8
+- Dynamic vs dynamic CCD — Future
+- Rotational CCD — Future
+- Warm starting — Disabled (requires contact geometry validation)
+- Body removal from pipeline — V0.4
+- Serialization — V0.9
+- WebSocket server for website — V0.9
 
 ## Build
 
@@ -140,14 +161,23 @@ Vakuum/
 ├── vakuum-constraints/# Future: joints & constraints
 ├── vakuum-solver/     # Impulse solver (depends on core, math, dynamics, collision)
 ├── vakuum-runtime/    # Future: execution & scheduling
-├── vakuum-runner/     # Simulation runner & JSON export
-├── vakuum-tests/      # Integration tests
+├── vakuum-runner/     # Simulation runner, pipeline & JSON export
+├── vakuum-website/    # Website integration adapter for Vakuum.xyz
+├── vakuum-tests/      # Integration tests & benchmarks
 └── vakuum-blender/    # Blender Python scripts
 ```
 
 ## Testing
 
-249+ comprehensive tests covering all mathematical operations, physics core, rigid body dynamics, collision detection, collision solver, and full integration tests (falling cube, multi-cube, stacking, stress test, reproducibility, free fall, static body, long-running stability).
+229+ comprehensive tests covering all mathematical operations, physics core, rigid body dynamics, collision detection (Box, Sphere, Capsule, ConvexHull), CCD, collision solver, collision filtering, Dynamic AABB Tree, and full integration tests (falling cube, multi-cube, stacking, stress test, reproducibility, free fall, static body, long-running stability, CCD pipeline).
+
+See also:
+- [CCD Support Matrix](docs/CCD_SUPPORT.md)
+- [Collision Shapes](docs/COLLISION_SHAPES.md)
+- [Constraint Solver](docs/SOLVER.md)
+- [Benchmarks](docs/BENCHMARKS.md)
+- [Known Limitations](docs/LIMITATIONS.md)
+- [Website Integration](docs/WEBSITE_INTEGRATION.md)
 
 ```bash
 mvn test
