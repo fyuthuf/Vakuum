@@ -2,8 +2,6 @@
 
 **Vakuum** is an independent 3D physics engine written entirely in Kotlin/JVM.
 
-It is **NOT** a Minecraft mod, a Valkyrien Skies addon, or a wrapper around an existing physics engine. Vakuum is a standalone physics library designed to be integrated into game engines, simulations, and other software through its public API.
-
 ## Architecture Reference
 
 Vakuum's architecture is inspired by [Jolt Physics](https://github.com/jrouwe/JoltPhysics) (public documentation only). Jolt is an architectural and educational reference, **not** a runtime dependency.
