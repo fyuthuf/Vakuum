@@ -185,4 +185,5 @@ mvn test
 
 ## License
 
-To be determined. See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+Vakuum is licensed under the Apache License 2.0.
+See the "LICENSE" file for details.
